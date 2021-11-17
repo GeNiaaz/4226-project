@@ -28,7 +28,7 @@ class TreeTopo(Topo):
                 # debugging
                 hosts_input = []
                 switches_input = []
-                links_input = []
+                self.links_input = []
 
             
                 with open(input_file_name) as f:

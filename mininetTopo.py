@@ -55,6 +55,7 @@ class TreeTopo(Topo):
                     # initialise links
                     for link_index in range(amt_links):
                         link_input = f.readline().strip().split(',')
+                        self.links_input.append(link_input)
                         dev1 = link_input[0]
                         dev2 = link_input[1]
                         bandwidth = link_input[2]
@@ -74,7 +75,7 @@ class TreeTopo(Topo):
 
                     # print links
                     print("input links: ")
-                    for link in self.links:
+                    for link in self.links_input:
                         print(link)
 
                     # sort | with keys | with info

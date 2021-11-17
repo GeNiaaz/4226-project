@@ -50,7 +50,7 @@ class TreeTopo(Topo):
                     for switch_index in range(amt_switches):
                         switches_input.append('s%d' % (switch_index + 1))
 
-                        self.addSwitch('s%d' % [switch_index + 1])
+                        self.addSwitch('s%d' % (switch_index + 1))
 
                     # initialise links
                     for link_index in range(amt_links):

@@ -47,22 +47,22 @@ class Controller(EventMixin):
         # print(packet)
 
         # throw error if parsing failed
-        if not packet.type:
-            log.warning("parse of event failed")
-            raise Exception("parse event failure")
+        # if not packet.type:
+        #     log.warning("parse of event failed")
+        #     raise Exception("parse event failure")
 
         # id of switch
-        dpid = packet.dpid
+        dpid = event.dpid
+
+        # port 
+        port_entry = event.port
         
         # mac addresses
         src_mac = packet.src
         dst_mac = packet.dst
 
-        # port 
-        port_entry = event.port
-
         # test
-        log.debug("Switch " + dpid + " got " + packet + " from port " + port_entry)
+        log.debug("Switch %s got %s from port %s" % (dpid, packet, port_entry))
 
         
         ''' LOGIC '''
@@ -89,27 +89,47 @@ class Controller(EventMixin):
 
             # multicast
             if dst_mac.is_multicast:
-                flood("Multicast >> Switch " + dpid)
+                flood("Multicast >> Switch %s" % (dpid))
                 return
 
             # not saved, flood
             elif dst_mac not in self.mac_port_dic[dpid]:
-                flood("Unknown, flooding >> Switch " + dpid + " on port " + dst_mac)
+                flood("Unknown, flooding >> Switch  %s on port %s" % (dpid, dst_mac))
                 return
 
             # saved, can access saved info
             else:
-                print("Saved >> Switch " + dpid + " on port " + dst_mac)
+                print("Saved >> Switch  %s on port %s" % (dpid, dst_mac))
+
+                flood_curr_info(event, packet)
+
 
                 # install enqueue to do here >>
                 # install_enqueue(event, packet, outport, q_id)
+
+        # flood based on current info
+        def flood_curr_info(event, packet):
+            # log.debug("Switch %s: Blindly forwarding %s:%i - > %s:%i", dpid, src_mac, port_entry, dst_mac, outport)
+
+            curr_port = self.mac_port_dic[dpid][dst_mac]
+            
+            # define your message here
+            msg = of.ofp_packet_out()
+            # flood msg
+            msg.actions.append(of.ofp_action_output(port = curr_port))
+            msg.match = of.ofp_match.from_packet(packet, port_entry)
+
+            msg.data = event.ofp
+            msg.in_port = event.port
+            event.connection.send(msg)
+
 
 
         # When it knows nothing about the destination, flood but don't install the rule
         def flood (message = None):
             log.info("Packet flooding: ")
 
-            # init msg
+            # define your message here
             msg = of.ofp_packet_out()
             # flood msg
             msg.actions.append(of.ofp_action_output(port = of.OFPP_FLOOD))
@@ -118,9 +138,8 @@ class Controller(EventMixin):
             msg.in_port = event.port
             event.connection.send(msg)
 
+            return
             
-            # define your message here
-
             # ofp_action_output: forwarding packets out of a physical or virtual port
             # OFPP_FLOOD: output all openflow ports expect the input port and those with 
             #    flooding disabled via the OFPPC_NO_FLOOD port config bit

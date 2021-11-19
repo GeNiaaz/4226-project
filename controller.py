@@ -187,7 +187,6 @@ class Controller(EventMixin):
             event.connection.send(msg)
 
 
-
         # When it knows nothing about the destination, flood but don't install the rule
         def flood (message = None):
             log.info("Packet flooding: ")

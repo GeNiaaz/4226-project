@@ -25,7 +25,10 @@ log = core.getLogger()
 ''' CONSTANTS '''
 # in seconds
 TTL = 10
+
 input_file_name = "topology.in"
+policy_file_name = "policy.in"
+
 Q_NORMAL = 0
 Q_PREMIUM = 1
 
@@ -42,6 +45,7 @@ class Controller(EventMixin):
         ''' added by me '''
         self.mac_port_dic = {}
         self.mac_port_ttl_dic = {}
+        self.premium_hosts = []
 
 
         
@@ -212,19 +216,112 @@ class Controller(EventMixin):
 
 
     def _handle_ConnectionUp(self, event):
-        dpid = dpid_to_str(event.dpid)
-        log.debug("Switch %s has come up.", dpid)
+        # dpid = dpid_to_str(event.dpid)
+        # log.debug("Switch %s has come up.", dpid)
         
         # Send the firewall policies to the switch
         def sendFirewallPolicy(connection, policy):
             # define your message here
-            pass
+            src_ip = policy[0]
+            dst_ip = policy[1]
+            dst_port = policy[2]
+
+            msg = of.ofp_flow_mod()
+
+            msg.priority = P_FIREWALL
+
+            # IP header for tcp
+            msg.match.nw_proto = 6 
+
+            msg.match.dl_type = 0x800
+
+            # set to ofpp_none, cannot send out
+            # msg.actions.append(of.ofp_action_output(port = of.OFPP_NONE))
+
+            # 2/3 policy
+            if src_ip == None:
+
+                # src
+                # msg.match.nw_src = IPAddr(src_ip)
+                msg.match.nw_src = None
+
+                #dst
+                msg.match.nw_dst = IPAddr(dst_ip)
+                msg.match.tp_dst = int(dst_port)
+            
+            # 3/3 policy
+            else:
+
+                # src
+                msg.match.nw_src = IPAddr(src_ip)
+
+                # dst
+                msg.match.nw_dst = IPAddr(dst_ip)
+                msg.match.tp_dst = int(dst_port)
+
+
+
+            connection.send(msg)
+            log.debug("Firewall rule added")
+            
             
             # OFPP_NONE: outputting to nowhere
             # msg.actions.append(of.ofp_action_output(port = of.OFPP_NONE))
 
-        # for i in [FIREWALL POLICIES]:
-        #     sendFirewallPolicy(event.connection, i)
+        def parse_policies_file(policy_input_name):
+            firewall_policies = []
+
+            with open(policy_input_name) as policies_f:
+                quantity = policies_f.readline().split(" ")
+                number_of_firewall_policies = int(quantity[0])
+                number_of_premium_hosts = int(quantity[1])
+
+
+                # saving policies
+                for policy_index in range(number_of_firewall_policies):
+                    policy_input = policies_f.readline().strip().split(',')
+
+                    # only dst_ip, p | 2/3 policy
+                    if len(policy_input) == 2:
+                        dst_ip = policy_input[0]
+                        dst_port = policy_input[1]
+
+                        # saving to policy arr
+                        policy = [None, dst_ip, dst_port]
+                        firewall_policies.append(policy)
+                    
+                    # src_ip, dst_ip, p | 3/3 policy
+                    elif len(policy_input) == 3:
+                        src_ip = policy_input[0]
+                        dst_ip = policy_input[1]
+                        dst_port = policy_input[2]   
+
+                        # saving to policy arr
+                        policy = [src_ip, dst_ip, dst_port]
+                        firewall_policies.append(policy)
+
+                    # SHOULD NOT REACH HERE
+                    else:
+                        log.debug("policy length wrong")
+                        return -1
+                
+
+                # saving hosts
+                for host_index in range(number_of_premium_hosts):
+                    host_input = policies_f.readline().strip()
+                    self.premium_hosts.append(host_input)
+                    
+
+            return firewall_policies
+
+
+        # ... 
+        dpid = dpid_to_str(event.dpid)
+        log.debug("Switch %s has come up.", dpid)
+
+        FIREWALL_POLICIES = parse_policies_file(policy_file_name)
+        for policy in FIREWALL_POLICIES:
+            sendFirewallPolicy(event.connection, policy)
             
 ''' DONT TOUCH THIS THING!! '''
 def launch():

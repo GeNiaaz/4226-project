@@ -77,6 +77,11 @@ class Controller(EventMixin):
         src_mac = packet.src
         dst_mac = packet.dst
 
+        # ip
+        src_ip = None
+        dst_ip = None
+
+
         # test
         log.debug("Switch %s got %s from port %s" % (dpid, packet, port_entry))
 
@@ -146,6 +151,19 @@ class Controller(EventMixin):
             event.connection.send(msg)
             # log.debug("** Switch %i: Rule sent: Outport %i, Queue %i\n", dpid, outport, q_id)
 
+        def get_q_id(src_ip, dst_ip):
+
+            log.info("ip saved is %s", src_ip)
+            
+
+            q_id = Q_NORMAL
+            if src_ip in self.premium_hosts or dst_ip in self.premium_hosts:
+                q_id = Q_PREMIUM
+
+            log.info("service is %s" % (q_id))
+
+            return q_id
+
     	# Check the packet and decide how to route the packet
         def forward(message = None):
 
@@ -168,7 +186,21 @@ class Controller(EventMixin):
 
                 # install enqueue to do here >>
                 outport = self.mac_port_dic[dpid][dst_mac]
-                q_id = Q_NORMAL
+
+                if packet.type == packet.IP_TYPE:
+                    src_ip = packet.payload.srcip
+                    dst_ip = packet.payload.dstip
+                elif packet.type == packet.ARP_TYPE:
+                    src_ip = packet.payload.protosrc
+                    dst_ip = packet.payload.protodst
+
+                # q_id = get_q_id()
+
+                # q_id = Q_NORMAL
+                # if src_ip in self.premium_hosts or dst_ip in self.premium_hosts:
+                #     q_id = Q_PREMIUM
+
+                q_id = get_q_id(src_ip, dst_ip)
 
                 install_enqueue(event, packet, outport, q_id)
 
@@ -210,7 +242,18 @@ class Controller(EventMixin):
             # OFPP_FLOOD: output all openflow ports expect the input port and those with 
             #    flooding disabled via the OFPPC_NO_FLOOD port config bit
             # msg.actions.append(of.ofp_action_output(port = of.OFPP_FLOOD))
-        
+
+        def set_ip():
+            if packet.type == packet.IP_TYPE:
+                src_ip = packet.payload.srcip
+                dst_ip = packet.payload.dstip
+            elif packet.type == packet.ARP_TYPE:
+                src_ip = packet.payload.protosrc
+                dst_ip = packet.payload.protodst
+                # if dst_mac.is_multicast:
+                #     dst_mac = host_ip_to_mac(dst_ip)
+
+        # set_ip()
         forward()
         remove_expired_ttl()
 
@@ -310,7 +353,6 @@ class Controller(EventMixin):
                 for host_index in range(number_of_premium_hosts):
                     host_input = policies_f.readline().strip()
                     self.premium_hosts.append(host_input)
-                    
 
             return firewall_policies
 

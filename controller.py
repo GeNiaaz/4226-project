@@ -94,14 +94,12 @@ class Controller(EventMixin):
 
             # not saved, flood
             elif dst_mac not in self.mac_port_dic[dpid]:
-                flood("Unknown, flooding >> Switch  %s on port %s" % (dpid, dst_mac))
+                flood("Unknown, flooding >> Switch  %s on mac %s" % (dpid, dst_mac))
                 return
 
             # saved, can access saved info
             else:
-                print("Saved >> Switch  %s on port %s" % (dpid, dst_mac))
-
-                flood_curr_info(event, packet)
+                flood_curr_info(event, packet)  
 
 
                 # install enqueue to do here >>
@@ -109,9 +107,9 @@ class Controller(EventMixin):
 
         # flood based on current info
         def flood_curr_info(event, packet):
-            # log.debug("Switch %s: Blindly forwarding %s:%i - > %s:%i", dpid, src_mac, port_entry, dst_mac, outport)
 
             curr_port = self.mac_port_dic[dpid][dst_mac]
+            log.debug("Known, flooding >> Switch  %s on mac %s on port %s" % (dpid, dst_mac, curr_port))
             
             # define your message here
             msg = of.ofp_packet_out()

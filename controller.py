@@ -24,8 +24,14 @@ log = core.getLogger()
 
 ''' CONSTANTS '''
 # in seconds
-TTL = 30
+TTL = 10
 input_file_name = "topology.in"
+Q_NORMAL = 0
+Q_PREMIUM = 1
+
+P_NORMAL = 100
+P_FIREWALL = 200
+
 
 
 class Controller(EventMixin):
@@ -109,7 +115,7 @@ class Controller(EventMixin):
                 time_diff = time_now - time_to_compare
 
                 if time_diff > ttl_time_format:
-                    log.debug("TTL expired, entry removed %s from switch %s" % (dst_mac, dpid))
+                    log.info("TTL expired, entry removed %s from switch %s" % (dst_mac, dpid))
 
                     # remove from mac-port
                     self.mac_port_dic[dpid].pop(dst_mac)
@@ -123,9 +129,18 @@ class Controller(EventMixin):
 
 
         def install_enqueue(event, packet, outport, q_id):
+            # log.debug("** Switch %i: Installing flow %s.%i -> %s.%i", dpid, src_mac, inport, dst_mac, outport)
+            msg = of.ofp_flow_mod()
 
-            # placeholder
-            pass
+            msg.idle_timeout = TTL 
+            msg.hard_timeout = TTL
+            msg.priority = P_NORMAL
+
+            msg.match = of.ofp_match.from_packet(packet, port_entry)
+            msg.actions.append(of.ofp_action_enqueue(port = outport, queue_id = q_id))
+            msg.data = event.ofp
+            event.connection.send(msg)
+            # log.debug("** Switch %i: Rule sent: Outport %i, Queue %i\n", dpid, outport, q_id)
 
     	# Check the packet and decide how to route the packet
         def forward(message = None):
@@ -136,21 +151,24 @@ class Controller(EventMixin):
             # multicast
             if dst_mac.is_multicast:
                 flood("Multicast >> Switch %s" % (dpid))
+                return
 
             # not saved, flood
             elif dst_mac not in self.mac_port_dic[dpid]:
                 flood("Unknown, flooding >> Switch  %s on mac %s" % (dpid, dst_mac))
+                return
 
             # saved, can access saved info
             else:
-                flood_curr_info(event, packet)  
-
-
-            # remove expired before returning
-            remove_expired_ttl()
+                # flood_curr_info(event, packet)  
 
                 # install enqueue to do here >>
-                # install_enqueue(event, packet, outport, q_id)
+                outport = self.mac_port_dic[dpid][dst_mac]
+                q_id = Q_NORMAL
+
+                install_enqueue(event, packet, outport, q_id)
+
+            # remove expired before returning
 
         # flood based on current info
         def flood_curr_info(event, packet):
@@ -191,6 +209,7 @@ class Controller(EventMixin):
             # msg.actions.append(of.ofp_action_output(port = of.OFPP_FLOOD))
         
         forward()
+        remove_expired_ttl()
 
 
     def _handle_ConnectionUp(self, event):

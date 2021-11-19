@@ -5,6 +5,7 @@ Please add your matric number:
 
 import sys
 import os
+import datetime
 from sets import Set
 
 from pox.core import core
@@ -20,6 +21,10 @@ from pox.lib.addresses import IPAddr, EthAddr
 log = core.getLogger()
 
 
+
+''' CONSTANTS '''
+# in seconds
+TTL = 30
 input_file_name = "topology.in"
 
 
@@ -30,6 +35,7 @@ class Controller(EventMixin):
 
         ''' added by me '''
         self.mac_port_dic = {}
+        self.mac_port_ttl_dic = {}
 
 
         
@@ -67,16 +73,53 @@ class Controller(EventMixin):
         
         ''' LOGIC '''
 
-        # check switch in dic
-        if dpid not in self.mac_port_dic:
-            self.mac_port_dic[dpid] = {}
+        # # check switch in dic
+        # if dpid not in self.mac_port_dic:
+        #     self.mac_port_dic[dpid] = {}
 
-        # check mac in switch dic
-        self.mac_port_dic[dpid][src_mac] = port_entry
-        
+        # # check switch in ttl dic
+        # if dpid not in self.mac_port_dic:
+        #     self.mac_port_ttl_dic[dpid] = {}
 
+        # # check mac in switch dic
+        # self.mac_port_dic[dpid][src_mac] = port_entry
 
+        # # check mac in switch dic
+        # self.mac_port_ttl_dic[dpid][src_mac] = datetime.datetime.now()
 
+        def update_info():
+
+            # check switch in dic
+            if dpid not in self.mac_port_dic:
+                self.mac_port_dic[dpid] = {} # update mac-port 
+                self.mac_port_ttl_dic[dpid] = {} # update ttl
+
+            # check if mac exists
+            # overwrite previous info and timings, regardless of expiry
+            if src_mac not in self.mac_port_dic[dpid]:
+                self.mac_port_dic[dpid][src_mac] = port_entry # update mac-port
+                self.mac_port_ttl_dic[dpid][src_mac] = datetime.datetime.now() # update ttl
+            
+        def remove_expired_ttl():
+            if dst_mac in self.mac_port_ttl_dic[dpid]:
+                time_now = datetime.datetime.now()
+                time_to_compare =  self.mac_port_ttl_dic[dpid][dst_mac]
+                ttl_time_format = datetime.timedelta(seconds=TTL)
+
+                time_diff = time_now - time_to_compare
+
+                if time_diff > ttl_time_format:
+                    log.debug("TTL expired, entry removed %s from switch %s" % (dst_mac, dpid))
+
+                    # remove from mac-port
+                    self.mac_port_dic[dpid].pop(dst_mac)
+
+                    # remove from ttl
+                    self.mac_port_ttl_dic[dpid].pop(dst_mac)
+
+            # dest mac not in dict, do nth
+            else:
+                return
 
 
         def install_enqueue(event, packet, outport, q_id):
@@ -87,20 +130,24 @@ class Controller(EventMixin):
     	# Check the packet and decide how to route the packet
         def forward(message = None):
 
+            # update info before processing pkt
+            update_info()
+
             # multicast
             if dst_mac.is_multicast:
                 flood("Multicast >> Switch %s" % (dpid))
-                return
 
             # not saved, flood
             elif dst_mac not in self.mac_port_dic[dpid]:
                 flood("Unknown, flooding >> Switch  %s on mac %s" % (dpid, dst_mac))
-                return
 
             # saved, can access saved info
             else:
                 flood_curr_info(event, packet)  
 
+
+            # remove expired before returning
+            remove_expired_ttl()
 
                 # install enqueue to do here >>
                 # install_enqueue(event, packet, outport, q_id)

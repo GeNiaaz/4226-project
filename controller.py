@@ -1,6 +1,6 @@
 '''
-Please add your name:
-Please add your matric number: 
+Please add your name: Muhammad Niaaz Wahab
+Please add your matric number: A0200161E
 '''
 
 import sys

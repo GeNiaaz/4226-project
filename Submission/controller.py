@@ -182,7 +182,6 @@ class Controller(EventMixin):
 
             # saved, can access saved info
             else:
-                # flood_curr_info(event, packet)  
 
                 # install enqueue to do here >>
                 outport = self.mac_port_dic[dpid][dst_mac]
@@ -193,12 +192,6 @@ class Controller(EventMixin):
                 elif packet.type == packet.ARP_TYPE:
                     src_ip = packet.payload.protosrc
                     dst_ip = packet.payload.protodst
-
-                # q_id = get_q_id()
-
-                # q_id = Q_NORMAL
-                # if src_ip in self.premium_hosts or dst_ip in self.premium_hosts:
-                #     q_id = Q_PREMIUM
 
                 q_id = get_q_id(src_ip, dst_ip)
 
